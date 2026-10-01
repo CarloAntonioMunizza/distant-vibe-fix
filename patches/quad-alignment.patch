@@ -1,0 +1,15 @@
+diff --git a/glsm/src/main/java/com/gtnewhorizons/angelica/glsm/streaming/TessellatorStreamingDrawer.java b/glsm/src/main/java/com/gtnewhorizons/angelica/glsm/streaming/TessellatorStreamingDrawer.java
+index 354e4ee..1c23c1d 100644
+--- a/glsm/src/main/java/com/gtnewhorizons/angelica/glsm/streaming/TessellatorStreamingDrawer.java
++++ b/glsm/src/main/java/com/gtnewhorizons/angelica/glsm/streaming/TessellatorStreamingDrawer.java
+@@ -377,7 +377,9 @@ public class TessellatorStreamingDrawer {
+         int firstVertex = -1;
+ 
+         if (persistentBuffer != null) {
+-            firstVertex = persistentBuffer.upload(combined, combinedStride);
++            // Keep shader vertices aligned to the shared quad EBO. This also avoids
++            // repeatedly overwriting the scratch EBO during deferred Vulkan draws.
++            firstVertex = persistentBuffer.upload(combined, combinedStride, 4);
+         }
+ 
+         if (firstVertex >= 0) {

@@ -1,0 +1,5 @@
+*.class
+asm-*.jar
+tool-fix.jar
+tracing-fix.jar
+/downloads/
