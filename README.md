@@ -18,7 +18,7 @@ The tracing build includes the tool fix. This repository publishes the patches a
 1. Close Minecraft normally and back up the existing Angelica JAR.
 2. Disable the existing Angelica JAR by moving it out of `mods` or changing its extension to `.disabled`.
 3. Put the chosen generated JAR in `mods`. Keep only one active Angelica JAR.
-4. In Prism Launcher, edit the instance's Java arguments through its settings UI. Keep `-Dangelica.sdlgpu.enable=true` and remove `-Dangelica.debug.forceOrphanStreaming=true` to use the fixed persistent path.
+4. In Prism Launcher, edit the instance's Java arguments through its settings UI. Keep `-Dangelica.sdlgpu.enable=true`
 5. Start Minecraft and test held tools while switching slots and looking around.
 
 The tested instance also used `-XX:+UseZGC -XX:+UseCompactObjectHeaders` with Java 25. Those JVM options are not part of the rendering fix and should not be copied to an incompatible Java version.
