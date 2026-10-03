@@ -3,3 +3,4 @@ asm-*.jar
 tool-fix.jar
 tracing-fix.jar
 /downloads/
+tracing-samplers-fix.jar

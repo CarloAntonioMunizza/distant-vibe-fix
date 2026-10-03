@@ -1,0 +1,39 @@
+diff --git a/src/gpu/SDL_gpu.c b/src/gpu/SDL_gpu.c
+index 5e6d2aa..1467953 100644
+--- a/src/gpu/SDL_gpu.c
++++ b/src/gpu/SDL_gpu.c
+@@ -991,8 +991,8 @@ SDL_GPUComputePipeline *SDL_CreateGPUComputePipeline(
+             return NULL;
+         }
+         if (createinfo->num_samplers > MAX_TEXTURE_SAMPLERS_PER_STAGE) {
+-            SDL_COMPILE_TIME_ASSERT(compute_texture_samplers, MAX_TEXTURE_SAMPLERS_PER_STAGE == 16);
+-            SDL_assert_release(!"Compute pipeline sampler count cannot be higher than 16!");
++            SDL_COMPILE_TIME_ASSERT(compute_texture_samplers, MAX_TEXTURE_SAMPLERS_PER_STAGE == 32);
++            SDL_assert_release(!"Compute pipeline sampler count cannot be higher than 32!");
+             return NULL;
+         }
+         if (createinfo->num_readonly_storage_textures > MAX_STORAGE_TEXTURES_PER_STAGE) {
+@@ -1204,8 +1204,8 @@ SDL_GPUShader *SDL_CreateGPUShader(
+             return NULL;
+         }
+         if (createinfo->num_samplers > MAX_TEXTURE_SAMPLERS_PER_STAGE) {
+-            SDL_COMPILE_TIME_ASSERT(shader_texture_samplers, MAX_TEXTURE_SAMPLERS_PER_STAGE == 16);
+-            SDL_assert_release(!"Shader sampler count cannot be higher than 16!");
++            SDL_COMPILE_TIME_ASSERT(shader_texture_samplers, MAX_TEXTURE_SAMPLERS_PER_STAGE == 32);
++            SDL_assert_release(!"Shader sampler count cannot be higher than 32!");
+             return NULL;
+         }
+         if (createinfo->num_storage_textures > MAX_STORAGE_TEXTURES_PER_STAGE) {
+diff --git a/src/gpu/SDL_sysgpu.h b/src/gpu/SDL_sysgpu.h
+index 8e0e349..7e825fd 100644
+--- a/src/gpu/SDL_sysgpu.h
++++ b/src/gpu/SDL_sysgpu.h
+@@ -26,7 +26,7 @@
+ 
+ // GraphicsDevice Limits
+ 
+-#define MAX_TEXTURE_SAMPLERS_PER_STAGE 16
++#define MAX_TEXTURE_SAMPLERS_PER_STAGE 32
+ #define MAX_STORAGE_TEXTURES_PER_STAGE 8
+ #define MAX_STORAGE_BUFFERS_PER_STAGE  8
+ #define MAX_UNIFORM_BUFFERS_PER_STAGE  4

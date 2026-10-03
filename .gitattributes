@@ -2,3 +2,4 @@
 *.md text eol=lf
 *.patch -text
 *.jar binary
+*.dll binary

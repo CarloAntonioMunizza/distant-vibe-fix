@@ -1,0 +1,118 @@
+diff --git a/sdl-gpu/src/main/java/com/gtnewhorizons/angelica/sdlgpu/SDLGPURenderBackend.java b/sdl-gpu/src/main/java/com/gtnewhorizons/angelica/sdlgpu/SDLGPURenderBackend.java
+--- a/sdl-gpu/src/main/java/com/gtnewhorizons/angelica/sdlgpu/SDLGPURenderBackend.java
++++ b/sdl-gpu/src/main/java/com/gtnewhorizons/angelica/sdlgpu/SDLGPURenderBackend.java
+@@ -51,6 +51,7 @@
+ import com.gtnewhorizons.angelica.sdlgpu.resource.TextureSamplerState;
+ import com.gtnewhorizons.angelica.sdlgpu.resource.TransferThread;
+ import com.gtnewhorizons.angelica.sdlgpu.sampler.SamplerBinder;
++import com.gtnewhorizons.angelica.sdlgpu.sampler.SamplerSlots;
+ import com.gtnewhorizons.angelica.sdlgpu.sampler.StorageBufferBinder;
+ import com.gtnewhorizons.angelica.sdlgpu.sampler.StorageTextureBinder;
+ import com.gtnewhorizons.angelica.sdlgpu.shader.ShaderManager;
+@@ -3971,8 +3972,8 @@
+     @Override public int getInteger(int pname) {
+         final ContextState cs = s();
+         return switch (pname) {
+-            case GL20.GL_MAX_TEXTURE_IMAGE_UNITS -> 17;
+-            case GL20.GL_MAX_VERTEX_TEXTURE_IMAGE_UNITS -> 17;
++            case GL20.GL_MAX_TEXTURE_IMAGE_UNITS -> SamplerSlots.textureUnits();
++            case GL20.GL_MAX_VERTEX_TEXTURE_IMAGE_UNITS -> SamplerSlots.textureUnits();
+             case GL20.GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS -> 32;
+             case GL20.GL_MAX_VERTEX_ATTRIBS -> 16;
+             case GL20.GL_MAX_DRAW_BUFFERS -> 8;
+diff --git a/sdl-gpu/src/main/java/com/gtnewhorizons/angelica/sdlgpu/frame/ContextState.java b/sdl-gpu/src/main/java/com/gtnewhorizons/angelica/sdlgpu/frame/ContextState.java
+--- a/sdl-gpu/src/main/java/com/gtnewhorizons/angelica/sdlgpu/frame/ContextState.java
++++ b/sdl-gpu/src/main/java/com/gtnewhorizons/angelica/sdlgpu/frame/ContextState.java
+@@ -41,7 +41,8 @@
+ 
+     public static final int MAX_INDEXED_BUFFERS = 16;
+     public static final int MAX_IMAGE_UNITS = 8;
+-    public static final int MAX_SAMPLERS = 16;
++    /** Binding buffer capacity; {@link com.gtnewhorizons.angelica.sdlgpu.sampler.SamplerSlots#perStage()} is the usable count. */
++    public static final int MAX_SAMPLERS = 32;
+     public static final int MAX_STORAGE_BUFFERS_PER_STAGE = 8;
+     public static final int MAX_VERTEX_ATTRIBS = 16;
+     public static final int MAX_COLOR_ATTACHMENTS = 8;
+diff --git a/sdl-gpu/src/main/java/com/gtnewhorizons/angelica/sdlgpu/resource/FBOClearTracker.java b/sdl-gpu/src/main/java/com/gtnewhorizons/angelica/sdlgpu/resource/FBOClearTracker.java
+--- a/sdl-gpu/src/main/java/com/gtnewhorizons/angelica/sdlgpu/resource/FBOClearTracker.java
++++ b/sdl-gpu/src/main/java/com/gtnewhorizons/angelica/sdlgpu/resource/FBOClearTracker.java
+@@ -4,6 +4,7 @@
+ import com.gtnewhorizons.angelica.sdlgpu.frame.FrameManager;
+ import com.gtnewhorizons.angelica.sdlgpu.resource.ResourceManager;
+ import com.gtnewhorizons.angelica.sdlgpu.sampler.SamplerLookup;
++import com.gtnewhorizons.angelica.sdlgpu.sampler.SamplerSlots;
+ import com.gtnewhorizons.angelica.sdlgpu.shader.ShaderManager;
+ import com.gtnewhorizons.angelica.sdlgpu.util.MemoryAccess;
+ import it.unimi.dsi.fastutil.ints.IntArrayList;
+@@ -100,10 +101,10 @@
+         depthHandles.clear();
+         depthGlIds.clear();
+ 
+-        final int fragSamplers = Math.min(prog.fragmentResources.numSamplers(), ContextState.MAX_SAMPLERS);
++        final int fragSamplers = Math.min(prog.fragmentResources.numSamplers(), SamplerSlots.perStage());
+         collectSamplerFlush(st, SamplerLookup.resolvedUnits(prog, true), fragSamplers, colorHandles, colorGlIds, depthHandles, depthGlIds);
+ 
+-        final int vertSamplers = Math.min(prog.vertexResources.numSamplers(), ContextState.MAX_SAMPLERS);
++        final int vertSamplers = Math.min(prog.vertexResources.numSamplers(), SamplerSlots.perStage());
+         collectSamplerFlush(st, SamplerLookup.resolvedUnits(prog, false), vertSamplers, colorHandles, colorGlIds, depthHandles, depthGlIds);
+ 
+         if (!colorHandles.isEmpty() || !depthHandles.isEmpty()) {
+diff --git a/sdl-gpu/src/main/java/com/gtnewhorizons/angelica/sdlgpu/sampler/SamplerBinder.java b/sdl-gpu/src/main/java/com/gtnewhorizons/angelica/sdlgpu/sampler/SamplerBinder.java
+--- a/sdl-gpu/src/main/java/com/gtnewhorizons/angelica/sdlgpu/sampler/SamplerBinder.java
++++ b/sdl-gpu/src/main/java/com/gtnewhorizons/angelica/sdlgpu/sampler/SamplerBinder.java
+@@ -116,8 +116,8 @@
+         final LogicOpVariant variant = fragment ? st.activeLogicOpVariant : null;
+         final int raw = variant != null ? variant.numSamplers : fragment ? prog.fragmentResources.numSamplers() : prog.vertexResources.numSamplers();
+         final int baseCount = variant != null ? variant.baseSamplers : raw;
+-        if (raw > ContextState.MAX_SAMPLERS) {
+-            throw new IllegalStateException("program " + st.boundProgram + " has " + raw + " " + (fragment ? "fragment" : "vertex") + " samplers; MAX=" + ContextState.MAX_SAMPLERS);
++        if (raw > SamplerSlots.perStage()) {
++            throw new IllegalStateException("program " + st.boundProgram + " has " + raw + " " + (fragment ? "fragment" : "vertex") + " samplers; MAX=" + SamplerSlots.perStage());
+         }
+         if (raw <= 0) return;
+         final SDL_GPUTextureSamplerBinding.Buffer bindings = (fragment ? st.fragSamplerBindings : st.vertSamplerBindings).position(0).limit(raw);
+@@ -174,7 +174,7 @@
+     }
+ 
+     private void bindFallbackForStage(long renderPass, ContextState st, long fallbackTexture, boolean fragment) {
+-        final int count = ContextState.MAX_SAMPLERS;
++        final int count = SamplerSlots.perStage();
+         final SDL_GPUTextureSamplerBinding.Buffer bindings = (fragment ? st.fragSamplerBindings : st.vertSamplerBindings).position(0).limit(count);
+         final long bindingsBase = MemoryUtil.memAddress(bindings);
+         final long sampler = resourceManager.getOrCreateDefaultSampler();
+diff --git a/sdl-gpu/src/main/java/com/gtnewhorizons/angelica/sdlgpu/sampler/SamplerSlots.java b/sdl-gpu/src/main/java/com/gtnewhorizons/angelica/sdlgpu/sampler/SamplerSlots.java
+new file mode 100644
+--- /dev/null
++++ b/sdl-gpu/src/main/java/com/gtnewhorizons/angelica/sdlgpu/sampler/SamplerSlots.java
+@@ -0,0 +1,31 @@
++package com.gtnewhorizons.angelica.sdlgpu.sampler;
++
++import org.apache.logging.log4j.LogManager;
++import org.lwjgl.sdl.SDLVersion;
++
++/**
++ * Sampler slots per shader stage. Stock SDL GPU allows 16 and overflows its binding arrays past that,
++ * so 32 is used only with an SDL built with MAX_TEXTURE_SAMPLERS_PER_STAGE 32 and
++ * SDL_VENDOR_INFO=angelica-samplers32.
++ */
++public final class SamplerSlots {
++    private static int perStage;
++
++    private SamplerSlots() {}
++
++    public static int perStage() {
++        int slots = perStage;
++        if (slots == 0) {
++            final String revision = SDLVersion.SDL_GetRevision();
++            slots = revision != null && revision.contains("angelica-samplers32") ? 32 : 16;
++            perStage = slots;
++            LogManager.getLogger("Angelica-SDLGPU").info("Sampler slots per shader stage: {} (SDL revision: {})", slots, revision);
++        }
++        return slots;
++    }
++
++    /** GL_MAX_TEXTURE_IMAGE_UNITS: 17 with stock SDL, matching the unpatched backend. */
++    public static int textureUnits() {
++        return perStage() == 32 ? 32 : 17;
++    }
++}

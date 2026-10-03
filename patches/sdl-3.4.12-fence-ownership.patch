@@ -1,0 +1,67 @@
+diff --git a/src/gpu/vulkan/SDL_gpu_vulkan.c b/src/gpu/vulkan/SDL_gpu_vulkan.c
+index ae19a13..7fc57fd 100644
+--- a/src/gpu/vulkan/SDL_gpu_vulkan.c
++++ b/src/gpu/vulkan/SDL_gpu_vulkan.c
+@@ -10771,15 +10771,18 @@ static bool VULKAN_Wait(
+     return true;
+ }
+ 
++static bool VULKAN_INTERNAL_Submit(
++    SDL_GPUCommandBuffer *commandBuffer,
++    VulkanFenceHandle **acquiredFence);
++
+ static SDL_GPUFence *VULKAN_SubmitAndAcquireFence(
+     SDL_GPUCommandBuffer *commandBuffer)
+ {
+-    VulkanCommandBuffer *vulkanCommandBuffer = (VulkanCommandBuffer *)commandBuffer;
+-    vulkanCommandBuffer->autoReleaseFence = false;
+-    if (!VULKAN_Submit(commandBuffer)) {
++    VulkanFenceHandle *fence = NULL;
++    if (!VULKAN_INTERNAL_Submit(commandBuffer, &fence)) {
+         return NULL;
+     }
+-    return (SDL_GPUFence *)vulkanCommandBuffer->inFlightFence;
++    return (SDL_GPUFence *)fence;
+ }
+ 
+ static void VULKAN_INTERNAL_ReleaseCommandBuffer(VulkanCommandBuffer *vulkanCommandBuffer)
+@@ -10798,8 +10801,9 @@ static void VULKAN_INTERNAL_ReleaseCommandBuffer(VulkanCommandBuffer *vulkanComm
+     renderer->submittedCommandBufferCount += 1;
+ }
+ 
+-static bool VULKAN_Submit(
+-    SDL_GPUCommandBuffer *commandBuffer)
++static bool VULKAN_INTERNAL_Submit(
++    SDL_GPUCommandBuffer *commandBuffer,
++    VulkanFenceHandle **acquiredFence)
+ {
+     VulkanCommandBuffer *vulkanCommandBuffer = (VulkanCommandBuffer *)commandBuffer;
+     VulkanRenderer *renderer = vulkanCommandBuffer->renderer;
+@@ -10969,6 +10973,14 @@ static bool VULKAN_Submit(
+         VULKAN_INTERNAL_PerformPendingDestroys(renderer);
+     }
+ 
++    /* The application gets its own reference. The command buffer keeps the one taken above until
++     * it is cleaned after completion, so a fence the application releases early is never returned
++     * to the pool and reset while its submission is still in flight. */
++    if (acquiredFence != NULL) {
++        (void)SDL_AtomicIncRef(&vulkanCommandBuffer->inFlightFence->referenceCount);
++        *acquiredFence = vulkanCommandBuffer->inFlightFence;
++    }
++
+     // Mark command buffer as submitted
+     VULKAN_INTERNAL_ReleaseCommandBuffer(vulkanCommandBuffer);
+ 
+@@ -10977,6 +10989,12 @@ static bool VULKAN_Submit(
+     return true;
+ }
+ 
++static bool VULKAN_Submit(
++    SDL_GPUCommandBuffer *commandBuffer)
++{
++    return VULKAN_INTERNAL_Submit(commandBuffer, NULL);
++}
++
+ static bool VULKAN_Cancel(
+     SDL_GPUCommandBuffer *commandBuffer)
+ {
